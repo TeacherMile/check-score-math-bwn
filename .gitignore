@@ -1,0 +1,9 @@
+# ไฟล์รายชื่อส่วนตัว (มีเบอร์โทรนักเรียน) — ห้ามอัปขึ้น repo สาธารณะ
+roster_private.json
+roster_full_private.json
+*.xlsx
+
+# ไฟล์ชั่วคราว
+.DS_Store
+node_modules/
+scratchpad/

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>สำหรับครู (แอดมิน) | กรอกคะแนนและข้อที่ผิด</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>" />
+<style>
+  :root{
+    --bg:#f1f5f9; --card:#fff; --ink:#1f2937; --muted:#6b7280;
+    --brand:#0f766e; --brand-dark:#0b5c55; --ring:#99f6e4; --line:#e5e7eb;
+    --warn:#b45309; --warnbg:#fffbeb; --ok:#059669; --okbg:#ecfdf5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:"Segoe UI",system-ui,-apple-system,"Sarabun",sans-serif;
+    background:var(--bg); color:var(--ink); padding:20px 14px 80px}
+  .wrap{max-width:1000px; margin:0 auto}
+  h1{font-size:20px; margin:0 0 4px}
+  .sub{color:var(--muted); font-size:14px; margin-bottom:18px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:18px; margin-bottom:16px; box-shadow:0 4px 14px rgba(15,118,110,.06)}
+  .step{font-weight:700; color:var(--brand); font-size:13px; letter-spacing:.02em; margin-bottom:8px}
+  button{font-family:inherit; font-size:14px; font-weight:600; border:none; border-radius:10px;
+    padding:11px 16px; cursor:pointer; background:var(--brand); color:#fff; transition:background .15s}
+  button:hover{background:var(--brand-dark)}
+  button.ghost{background:#fff; color:var(--brand); border:1.5px solid var(--brand)}
+  button.ghost:hover{background:#f0fdfa}
+  input,select{font-family:inherit; font-size:14px; padding:9px 10px; border:1.5px solid var(--line);
+    border-radius:9px; background:#fff; color:var(--ink)}
+  input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--ring)}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .muted{color:var(--muted); font-size:13px}
+  .warnbox{background:var(--warnbg); border:1px solid #fde68a; color:var(--warn);
+    padding:10px 12px; border-radius:10px; font-size:13px; margin-top:10px; display:none}
+  .okbox{background:var(--okbg); border:1px solid #a7f3d0; color:var(--ok);
+    padding:10px 12px; border-radius:10px; font-size:13px; margin-top:10px; display:none}
+  .tablewrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
+  table{border-collapse:collapse; width:100%; font-size:13.5px; min-width:760px}
+  th,td{border-bottom:1px solid var(--line); padding:8px 8px; text-align:left; vertical-align:middle}
+  th{position:sticky; top:0; background:#f8fafc; z-index:1; font-size:12.5px; color:var(--muted)}
+  tr:hover td{background:#f8fafc}
+  td .sc{width:64px; text-align:center}
+  td .wr{width:150px}
+  td .ph{width:130px}
+  .no{color:var(--muted); width:42px}
+  .nm{white-space:nowrap}
+  .cls{color:var(--muted); white-space:nowrap}
+  .scored td .sc{border-color:#5eead4; background:#f0fdfa}
+  .hidden{display:none}
+  .toolbar{position:sticky; bottom:0; background:linear-gradient(#f1f5f9cc,#f1f5f9);
+    padding:12px 0; margin-top:8px; backdrop-filter:blur(4px)}
+  code{background:#f1f5f9; padding:1px 6px; border-radius:6px; font-size:13px}
+  .count{font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔑 หน้าสำหรับครู (แอดมิน)</h1>
+  <div class="sub">กรอก/แก้ไขคะแนนและข้อที่ผิดของนักเรียน แล้วสร้างไฟล์ไปอัปเดตหน้าเว็บ</div>
+
+  <!-- ขั้นที่ 0: รหัสผ่าน -->
+  <div class="card" id="gateCard">
+    <div class="step">เข้าสู่ระบบแอดมิน</div>
+    <div class="row">
+      <input id="pw" type="password" placeholder="รหัสผ่านแอดมิน" style="flex:1;min-width:180px" />
+      <button id="pwBtn">เข้าสู่ระบบ</button>
+    </div>
+    <div class="warnbox" id="pwWarn">รหัสผ่านไม่ถูกต้อง</div>
+    <div class="muted" style="margin-top:10px">
+      รหัสเริ่มต้นคือ <code>mathadmin</code> — เปลี่ยนได้ในไฟล์ <code>admin.html</code> (ตัวแปร <code>ADMIN_PASSWORD</code>)
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <!-- ขั้นที่ 1: โหลดไฟล์รายชื่อ -->
+    <div class="card">
+      <div class="step">ขั้นที่ 1 · โหลดไฟล์รายชื่อ (มีเบอร์โทร)</div>
+      <div class="row">
+        <input type="file" id="file" accept=".json" />
+        <span class="muted">เลือกไฟล์ <code>roster_private.json</code> ที่คุณครูเก็บไว้ในเครื่อง</span>
+      </div>
+      <div class="okbox" id="loadOk"></div>
+      <div class="warnbox" id="loadWarn"></div>
+    </div>
+
+    <!-- ขั้นที่ 2: กรอกคะแนน -->
+    <div class="card" id="editCard" style="display:none">
+      <div class="step">ขั้นที่ 2 · กรอกคะแนนและข้อที่ผิด</div>
+      <div class="row" style="margin-bottom:10px">
+        <input id="search" placeholder="🔍 ค้นหาชื่อ / นามสกุล / ห้อง" style="flex:1;min-width:200px" />
+        <label class="muted">คะแนนเต็ม
+          <input id="maxScore" class="sc" type="number" min="1" value="30" />
+        </label>
+        <span class="muted">แสดง <span class="count" id="shownCount">0</span> คน</span>
+      </div>
+      <div class="muted" style="margin-bottom:10px">
+        ช่อง <b>ข้อที่ผิด</b> พิมพ์เลขข้อคั่นด้วยจุลภาค เช่น <code>3, 7, 12</code>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr><th class="no">ที่</th><th>ชื่อ–สกุล</th><th>ห้อง</th><th>เบอร์โทร</th><th>คะแนน</th><th>ข้อที่ผิด</th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="toolbar">
+        <div class="row">
+          <button id="genBtn">📤 สร้างไฟล์สำหรับเผยแพร่ (students.json + records.json)</button>
+          <button class="ghost" id="saveBtn">💾 บันทึกไฟล์รายชื่อ (เก็บไว้แก้ครั้งหน้า)</button>
+        </div>
+        <div class="okbox" id="genOk"></div>
+        <div class="warnbox" id="genWarn"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { normalizePhone, encryptRecord } from "./build/crypto-core.mjs";
+
+// ===== เปลี่ยนรหัสผ่านแอดมินได้ที่บรรทัดนี้ =====
+const ADMIN_PASSWORD = "mathadmin";
+// ================================================
+
+const $ = (id) => document.getElementById(id);
+let roster = [];       // ข้อมูลทั้งหมด (มีเบอร์โทร)
+let filtered = [];
+
+// --- รหัสผ่าน ---
+$("pwBtn").addEventListener("click", () => {
+  if ($("pw").value === ADMIN_PASSWORD) {
+    $("gateCard").classList.add("hidden");
+    $("app").classList.remove("hidden");
+  } else {
+    $("pwWarn").style.display = "block";
+  }
+});
+$("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") $("pwBtn").click(); });
+
+// --- โหลดไฟล์รายชื่อ ---
+$("file").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    roster = JSON.parse(await f.text());
+    if (!Array.isArray(roster)) throw new Error("รูปแบบไฟล์ไม่ถูกต้อง");
+    roster.sort((a, b) => a.no - b.no);
+    const scored = roster.filter((r) => r.score !== null && r.score !== undefined && r.score !== "").length;
+    const noPhone = roster.filter((r) => !normalizePhone(r.phone)).length;
+    $("loadOk").style.display = "block";
+    $("loadOk").innerHTML = `โหลดสำเร็จ: <b>${roster.length}</b> คน · มีคะแนนแล้ว <b>${scored}</b> คน` +
+      (noPhone ? ` · <span style="color:#b45309">ยังไม่มีเบอร์โทร ${noPhone} คน (เข้าดูคะแนนไม่ได้จนกว่าจะเพิ่มเบอร์)</span>` : "");
+    const mx = roster.find((r) => r.max)?.max || 30;
+    $("maxScore").value = mx;
+    $("editCard").style.display = "block";
+    render();
+  } catch (err) {
+    $("loadWarn").style.display = "block";
+    $("loadWarn").textContent = "อ่านไฟล์ไม่สำเร็จ: " + err.message;
+  }
+});
+
+// --- ตาราง ---
+function render() {
+  const q = $("search").value.trim().toLowerCase();
+  filtered = roster.filter((r) => {
+    if (!q) return true;
+    return (`${r.prefix}${r.first} ${r.last} ${r.classroom}`).toLowerCase().includes(q);
+  });
+  const tb = $("tbody");
+  tb.innerHTML = "";
+  for (const r of filtered) {
+    const tr = document.createElement("tr");
+    const scored = r.score !== null && r.score !== undefined && r.score !== "";
+    if (scored) tr.className = "scored";
+    tr.innerHTML =
+      `<td class="no">${r.no}</td>` +
+      `<td class="nm">${r.prefix}${r.first} ${r.last}</td>` +
+      `<td class="cls">${r.classroom}</td>` +
+      `<td><input class="ph" data-no="${r.no}" data-k="phone" value="${normalizePhone(r.phone)}" placeholder="—"></td>` +
+      `<td><input class="sc" data-no="${r.no}" data-k="score" type="number" min="0" value="${scored ? r.score : ""}" placeholder="—"></td>` +
+      `<td><input class="wr" data-no="${r.no}" data-k="wrong" value="${(r.wrong||[]).join(', ')}" placeholder="เช่น 3, 7, 12"></td>`;
+    tb.appendChild(tr);
+  }
+  $("shownCount").textContent = filtered.length;
+}
+
+$("search").addEventListener("input", render);
+
+// เก็บค่าที่พิมพ์กลับเข้า roster ทันที
+$("tbody").addEventListener("input", (e) => {
+  const el = e.target;
+  const no = Number(el.dataset.no);
+  const k = el.dataset.k;
+  if (!k) return;
+  const r = roster.find((x) => x.no === no);
+  if (!r) return;
+  if (k === "phone") r.phone = el.value;
+  else if (k === "score") r.score = el.value === "" ? null : Number(el.value);
+  else if (k === "wrong") {
+    r.wrong = el.value.split(",").map((s) => s.trim()).filter((s) => s !== "")
+      .map((s) => (/^\d+$/.test(s) ? Number(s) : s));
+  }
+  if (k === "score") {
+    const scored = r.score !== null && r.score !== undefined && r.score !== "";
+    el.closest("tr").classList.toggle("scored", scored);
+  }
+});
+
+// --- ดาวน์โหลด helper ---
+function download(name, text) {
+  const blob = new Blob([text], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// --- บันทึกไฟล์รายชื่อ (เก็บไว้) ---
+$("saveBtn").addEventListener("click", () => {
+  const mx = Number($("maxScore").value) || 30;
+  const out = roster.map((r) => ({ ...r, max: mx }));
+  download("roster_private.json", JSON.stringify(out, null, 1));
+  flashOk("บันทึกไฟล์ roster_private.json แล้ว — เก็บไฟล์นี้ไว้ในเครื่องเพื่อแก้ไขครั้งต่อไป (อย่าอัปโหลดขึ้นเว็บสาธารณะ)");
+});
+
+// --- สร้างไฟล์เผยแพร่ ---
+$("genBtn").addEventListener("click", async () => {
+  $("genWarn").style.display = "none";
+  const mx = Number($("maxScore").value) || 30;
+  const btn = $("genBtn");
+  btn.disabled = true; btn.textContent = "กำลังสร้างไฟล์...";
+  try {
+    const students = [];
+    const records = {};
+    const skipped = [];
+    for (const r of roster) {
+      students.push({ no: r.no, prefix: r.prefix || "", first: (r.first||"").trim(),
+                      last: (r.last||"").trim(), classroom: r.classroom || "" });
+      const phone = normalizePhone(r.phone);
+      if (!phone) { skipped.push(r.no); continue; }
+      const payload = {
+        score: (r.score === "" || r.score === undefined) ? null : r.score,
+        max: mx,
+        wrong: Array.isArray(r.wrong) ? r.wrong : [],
+      };
+      records[r.no] = await encryptRecord(phone, payload);
+    }
+    students.sort((a, b) => a.no - b.no);
+    download("students.json", JSON.stringify(students));
+    download("records.json", JSON.stringify(records));
+    let msg = `สร้างไฟล์สำเร็จ! ดาวน์โหลด <b>students.json</b> และ <b>records.json</b> แล้ว<br>` +
+      `นำ 2 ไฟล์นี้ไปวางแทนของเดิมในโฟลเดอร์ <code>data/</code> ของ repo (ดูวิธีใน README)`;
+    if (skipped.length) msg += `<br><span style="color:#b45309">หมายเหตุ: ลำดับที่ ${skipped.join(", ")} ไม่มีเบอร์โทร จึงยังเข้าดูคะแนนไม่ได้</span>`;
+    $("genOk").style.display = "block";
+    $("genOk").innerHTML = msg;
+  } catch (err) {
+    $("genWarn").style.display = "block";
+    $("genWarn").textContent = "เกิดข้อผิดพลาด: " + err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "📤 สร้างไฟล์สำหรับเผยแพร่ (students.json + records.json)";
+  }
+});
+
+function flashOk(m) {
+  const el = $("genOk");
+  el.style.display = "block"; el.innerHTML = m;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ดูคะแนนสอบ | กิจกรรมพัฒนาศักยภาพสู่ความเป็นเลิศทางคณิตศาสตร์</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📐</text></svg>" />
+<style>
+  :root{
+    --bg:#eef2f7; --card:#ffffff; --ink:#1f2937; --muted:#6b7280;
+    --brand:#2563eb; --brand-dark:#1d4ed8; --ring:#bfdbfe;
+    --ok:#059669; --okbg:#ecfdf5; --err:#dc2626; --errbg:#fef2f2;
+    --line:#e5e7eb;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:"Segoe UI",system-ui,-apple-system,"Sarabun",sans-serif;
+    background:linear-gradient(160deg,#dbeafe,#eef2f7 40%); color:var(--ink);
+    min-height:100vh; display:flex; align-items:flex-start; justify-content:center;
+    padding:24px 16px 60px;
+  }
+  .wrap{width:100%; max-width:560px}
+  .head{text-align:center; margin-bottom:18px}
+  .head .badge{font-size:34px}
+  .head h1{font-size:20px; margin:8px 0 4px; line-height:1.4}
+  .head p{margin:0; color:var(--muted); font-size:14px}
+  .card{
+    background:var(--card); border-radius:18px; padding:22px;
+    box-shadow:0 10px 30px rgba(37,99,235,.10); border:1px solid var(--line);
+  }
+  label{display:block; font-weight:600; font-size:14px; margin:14px 0 6px}
+  label:first-of-type{margin-top:0}
+  select,input{
+    width:100%; padding:13px 14px; font-size:16px; border:1.5px solid var(--line);
+    border-radius:12px; background:#fff; color:var(--ink); font-family:inherit;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  select:focus,input:focus{outline:none; border-color:var(--brand); box-shadow:0 0 0 4px var(--ring)}
+  .hint{font-size:12.5px; color:var(--muted); margin-top:6px}
+  button{
+    width:100%; margin-top:20px; padding:14px; font-size:16px; font-weight:700;
+    color:#fff; background:var(--brand); border:none; border-radius:12px; cursor:pointer;
+    font-family:inherit; transition:background .15s;
+  }
+  button:hover{background:var(--brand-dark)}
+  button:disabled{opacity:.6; cursor:progress}
+  .msg{margin-top:16px; padding:12px 14px; border-radius:12px; font-size:14px; display:none}
+  .msg.err{display:block; background:var(--errbg); color:var(--err); border:1px solid #fecaca}
+  /* หน้าผลคะแนน */
+  .result{display:none}
+  .result.show{display:block}
+  .rname{font-size:18px; font-weight:700}
+  .rclass{color:var(--muted); font-size:14px; margin-top:2px}
+  .scorebox{
+    text-align:center; background:var(--okbg); border:1px solid #a7f3d0;
+    border-radius:16px; padding:22px; margin:18px 0;
+  }
+  .scorebox .num{font-size:52px; font-weight:800; color:var(--ok); line-height:1}
+  .scorebox .num small{font-size:22px; color:var(--muted); font-weight:600}
+  .scorebox .lbl{color:var(--muted); font-size:14px; margin-top:6px}
+  .pending{color:var(--muted)}
+  .wrongwrap{margin-top:4px}
+  .wrongwrap h3{font-size:15px; margin:0 0 10px}
+  .chips{display:flex; flex-wrap:wrap; gap:8px}
+  .chip{
+    background:var(--errbg); color:var(--err); border:1px solid #fecaca;
+    padding:6px 12px; border-radius:999px; font-size:14px; font-weight:600;
+  }
+  .allright{color:var(--ok); font-weight:600; font-size:14px}
+  .backlink{display:block; text-align:center; margin-top:22px; color:var(--brand);
+    background:none; padding:0; font-size:14px; text-decoration:underline}
+  .foot{text-align:center; color:var(--muted); font-size:12px; margin-top:20px}
+  .foot a{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="badge">📐</div>
+    <h1>ระบบดูคะแนนสอบวัดความรู้<br />กิจกรรมพัฒนาศักยภาพสู่ความเป็นเลิศทางคณิตศาสตร์</h1>
+    <p>ประจำปีการศึกษา 2569</p>
+  </div>
+
+  <div class="card">
+    <!-- ฟอร์มเข้าสู่ระบบ -->
+    <div id="loginView">
+      <label for="student">ชื่อ–สกุลของนักเรียน</label>
+      <select id="student"><option value="">— เลือกชื่อของคุณ —</option></select>
+
+      <label for="phone">หมายเลขโทรศัพท์</label>
+      <input id="phone" type="tel" inputmode="numeric" autocomplete="off"
+             placeholder="เช่น 0812345678" />
+      <div class="hint">พิมพ์เฉพาะตัวเลข ไม่ต้องมีขีดหรือเว้นวรรค (ถ้ามี 2 เบอร์ ให้ใช้เบอร์แรก)</div>
+
+      <button id="loginBtn">ดูคะแนนของฉัน</button>
+      <div class="msg err" id="errMsg"></div>
+    </div>
+
+    <!-- ผลคะแนน -->
+    <div class="result" id="resultView">
+      <div class="rname" id="rName"></div>
+      <div class="rclass" id="rClass"></div>
+
+      <div class="scorebox" id="scoreBox"></div>
+
+      <div class="wrongwrap" id="wrongWrap">
+        <h3>ข้อที่ตอบผิด</h3>
+        <div id="wrongContent"></div>
+      </div>
+
+      <button class="backlink" id="backBtn" type="button">← กลับไปหน้าเข้าสู่ระบบ</button>
+    </div>
+  </div>
+
+  <div class="foot">
+    ระบบนี้ปกป้องความเป็นส่วนตัว คะแนนถูกเข้ารหัสด้วยเบอร์โทรของนักเรียนแต่ละคน
+  </div>
+</div>
+
+<script type="module">
+import { normalizePhone, decryptRecord } from "./build/crypto-core.mjs";
+
+const $ = (id) => document.getElementById(id);
+let students = [];
+let records = {};
+
+async function load() {
+  try {
+    const [s, r] = await Promise.all([
+      fetch("data/students.json").then((x) => x.json()),
+      fetch("data/records.json").then((x) => x.json()),
+    ]);
+    students = s;
+    records = r;
+    const sel = $("student");
+    for (const st of students) {
+      const opt = document.createElement("option");
+      opt.value = String(st.no);
+      opt.textContent = `${st.prefix}${st.first} ${st.last} (${st.classroom})`;
+      sel.appendChild(opt);
+    }
+  } catch (e) {
+    showErr("โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรชหน้าใหม่อีกครั้ง");
+  }
+}
+
+function showErr(m) {
+  const el = $("errMsg");
+  el.textContent = m;
+  el.style.display = "block";
+}
+function clearErr() {
+  $("errMsg").style.display = "none";
+}
+
+async function login() {
+  clearErr();
+  const no = $("student").value;
+  const phone = normalizePhone($("phone").value);
+  if (!no) return showErr("กรุณาเลือกชื่อของคุณจากรายการ");
+  if (!phone) return showErr("กรุณากรอกหมายเลขโทรศัพท์");
+
+  const rec = records[no];
+  if (!rec) {
+    return showErr("ยังไม่มีข้อมูลเบอร์โทรของนักเรียนคนนี้ในระบบ กรุณาติดต่อคุณครู");
+  }
+
+  const btn = $("loginBtn");
+  btn.disabled = true;
+  btn.textContent = "กำลังตรวจสอบ...";
+  try {
+    const data = await decryptRecord(phone, rec);
+    showResult(no, data);
+  } catch (e) {
+    showErr("หมายเลขโทรศัพท์ไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "ดูคะแนนของฉัน";
+  }
+}
+
+function showResult(no, data) {
+  const st = students.find((x) => String(x.no) === String(no));
+  $("rName").textContent = `${st.prefix}${st.first} ${st.last}`;
+  $("rClass").textContent = `ระดับชั้น ${st.classroom}`;
+
+  const box = $("scoreBox");
+  const max = data.max ?? 30;
+  if (data.score === null || data.score === undefined || data.score === "") {
+    box.innerHTML = `<div class="lbl pending">ยังไม่มีการบันทึกคะแนน</div>
+      <div class="pending" style="margin-top:8px">คุณครูยังไม่ได้กรอกคะแนนของนักเรียน</div>`;
+    $("wrongWrap").style.display = "none";
+  } else {
+    box.innerHTML = `<div class="num">${data.score}<small> / ${max}</small></div>
+      <div class="lbl">คะแนนที่ได้ (คะแนนเต็ม ${max} คะแนน)</div>`;
+    // ข้อที่ผิด
+    $("wrongWrap").style.display = "block";
+    const wc = $("wrongContent");
+    const wrong = Array.isArray(data.wrong) ? data.wrong : [];
+    if (wrong.length === 0) {
+      wc.innerHTML = `<div class="allright">✓ ไม่มีข้อมูลข้อที่ผิด</div>`;
+    } else {
+      wc.innerHTML = `<div class="chips">` +
+        wrong.map((q) => `<span class="chip">ข้อ ${q}</span>`).join("") + `</div>`;
+    }
+  }
+
+  $("loginView").style.display = "none";
+  $("resultView").classList.add("show");
+}
+
+function back() {
+  $("resultView").classList.remove("show");
+  $("loginView").style.display = "block";
+  $("phone").value = "";
+  clearErr();
+}
+
+$("loginBtn").addEventListener("click", login);
+$("phone").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+$("backBtn").addEventListener("click", back);
+load();
+</script>
+</body>
+</html>
