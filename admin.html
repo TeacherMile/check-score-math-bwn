@@ -10,6 +10,7 @@
     --bg:#f1f5f9; --card:#fff; --ink:#1f2937; --muted:#6b7280;
     --brand:#0f766e; --brand-dark:#0b5c55; --ring:#99f6e4; --line:#e5e7eb;
     --warn:#b45309; --warnbg:#fffbeb; --ok:#059669; --okbg:#ecfdf5;
+    --err:#dc2626; --errbg:#fef2f2;
   }
   *{box-sizing:border-box}
   body{margin:0; font-family:"Segoe UI",system-ui,-apple-system,"Sarabun",sans-serif;
@@ -41,7 +42,6 @@
   tr:hover td{background:#f8fafc}
   td .id{width:74px; text-align:center; font-weight:600}
   td .sc{width:60px; text-align:center}
-  td .wr{width:150px}
   td .ph{width:126px}
   .nm{white-space:nowrap}
   .cls{color:var(--muted); white-space:nowrap}
@@ -51,6 +51,31 @@
     padding:12px 0; margin-top:8px; backdrop-filter:blur(4px)}
   code{background:#f1f5f9; padding:1px 6px; border-radius:6px; font-size:13px}
   .count{font-weight:700}
+  /* ปุ่มเลือกข้อที่ผิดในแต่ละแถว */
+  .wrbtn{background:#fff; color:var(--ink); border:1.5px dashed var(--line); border-radius:9px;
+    padding:8px 10px; font-size:13px; font-weight:500; width:190px; text-align:left; cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .wrbtn:hover{border-color:var(--brand); background:#f0fdfa}
+  .wrbtn.has{border-style:solid; border-color:#fecaca; background:var(--errbg); color:var(--err); font-weight:600}
+  /* Modal */
+  .overlay{position:fixed; inset:0; background:rgba(15,23,42,.45); display:none;
+    align-items:center; justify-content:center; padding:16px; z-index:50}
+  .overlay.show{display:flex}
+  .modal{background:#fff; border-radius:16px; padding:20px; width:100%; max-width:460px;
+    box-shadow:0 20px 50px rgba(0,0,0,.25); max-height:90vh; overflow:auto}
+  .modal h2{font-size:17px; margin:0 0 2px}
+  .modal .who{color:var(--muted); font-size:13px; margin-bottom:14px}
+  .qgrid{display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:14px}
+  .qbtn{padding:10px 0; text-align:center; border:1.5px solid var(--line); border-radius:10px;
+    background:#fff; color:var(--ink); font-weight:600; font-size:15px; cursor:pointer; transition:.1s}
+  .qbtn:hover{border-color:var(--err)}
+  .qbtn.sel{background:var(--err); border-color:var(--err); color:#fff}
+  .modal .summary{font-size:14px; margin-bottom:14px; padding:10px 12px; border-radius:10px;
+    background:#f8fafc; border:1px solid var(--line)}
+  .modal .summary b{color:var(--err)}
+  .modal .actions{display:flex; gap:10px; flex-wrap:wrap}
+  .modal .actions .spacer{flex:1}
+  @media (max-width:420px){ .qgrid{grid-template-columns:repeat(5,1fr)} }
 </style>
 </head>
 <body>
@@ -88,13 +113,16 @@
       <div class="step">ขั้นที่ 2 · กรอกคะแนนและข้อที่ผิด</div>
       <div class="row" style="margin-bottom:10px">
         <input id="search" placeholder="🔍 ค้นหาเลขประจำตัว / ชื่อ / ห้อง" style="flex:1;min-width:200px" />
+        <label class="muted">จำนวนข้อสอบ
+          <input id="numQ" class="sc" type="number" min="1" value="30" />
+        </label>
         <label class="muted">คะแนนเต็ม
           <input id="maxScore" class="sc" type="number" min="1" value="30" />
         </label>
         <span class="muted">แสดง <span class="count" id="shownCount">0</span> คน</span>
       </div>
       <div class="muted" style="margin-bottom:10px">
-        ช่อง <b>ข้อที่ผิด</b> พิมพ์เลขข้อคั่นด้วยจุลภาค เช่น <code>3, 7, 12</code>
+        คลิกปุ่มในช่อง <b>ข้อที่ผิด</b> เพื่อเลือกข้อ 1–<span id="numQLabel">30</span> ที่ตอบผิด
       </div>
       <div class="tablewrap">
         <table>
@@ -113,6 +141,25 @@
         <div class="okbox" id="genOk"></div>
         <div class="warnbox" id="genWarn"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal เลือกข้อที่ผิด -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>เลือกข้อที่ตอบผิด</h2>
+    <div class="who" id="mWho"></div>
+    <div class="qgrid" id="qgrid"></div>
+    <div class="summary" id="mSummary"></div>
+    <div class="actions">
+      <button class="ghost" id="mClear" type="button">ล้างทั้งหมด</button>
+      <button class="ghost" id="mAutoScore" type="button">ตั้งคะแนน = เต็ม − ผิด</button>
+      <span class="spacer"></span>
+      <button id="mSave" type="button">บันทึก</button>
+    </div>
+    <div style="margin-top:10px;text-align:right">
+      <button class="ghost" id="mCancel" type="button" style="border:none">ยกเลิก</button>
     </div>
   </div>
 </div>
@@ -165,7 +212,18 @@ $("file").addEventListener("change", async (e) => {
   }
 });
 
+// --- จำนวนข้อ ---
+$("numQ").addEventListener("input", () => {
+  $("numQLabel").textContent = $("numQ").value || 30;
+});
+
 // --- ตาราง ---
+function wrongSummary(wrong) {
+  const w = Array.isArray(wrong) ? wrong : [];
+  if (w.length === 0) return { text: "— เลือกข้อที่ผิด —", has: false };
+  return { text: `ผิด ${w.length} ข้อ: ${w.join(", ")}`, has: true };
+}
+
 function render() {
   const q = $("search").value.trim().toLowerCase();
   filtered = roster.filter((r) => {
@@ -178,20 +236,21 @@ function render() {
     const tr = document.createElement("tr");
     const scored = r.score !== null && r.score !== undefined && r.score !== "";
     if (scored) tr.className = "scored";
+    const sum = wrongSummary(r.wrong);
     tr.innerHTML =
       `<td><input class="id" data-no="${r.no}" data-k="student_id" value="${r.student_id || ""}" placeholder="—"></td>` +
       `<td class="nm">${r.prefix}${r.first} ${r.last}</td>` +
       `<td class="cls">${r.classroom}</td>` +
       `<td><input class="ph" data-no="${r.no}" data-k="phone" value="${normalizePhone(r.phone)}" placeholder="—"></td>` +
       `<td><input class="sc" data-no="${r.no}" data-k="score" type="number" min="0" value="${scored ? r.score : ""}" placeholder="—"></td>` +
-      `<td><input class="wr" data-no="${r.no}" data-k="wrong" value="${(r.wrong||[]).join(', ')}" placeholder="เช่น 3, 7, 12"></td>`;
+      `<td><button type="button" class="wrbtn ${sum.has ? "has" : ""}" data-no="${r.no}">${sum.text}</button></td>`;
     tb.appendChild(tr);
   }
   $("shownCount").textContent = filtered.length;
 }
 $("search").addEventListener("input", render);
 
-// เก็บค่าที่พิมพ์กลับเข้า roster ทันที
+// เก็บค่า input (เลขประจำตัว/เบอร์/คะแนน) กลับเข้า roster ทันที
 $("tbody").addEventListener("input", (e) => {
   const el = e.target;
   const no = Number(el.dataset.no);
@@ -201,16 +260,82 @@ $("tbody").addEventListener("input", (e) => {
   if (!r) return;
   if (k === "phone") r.phone = el.value;
   else if (k === "student_id") r.student_id = el.value.trim();
-  else if (k === "score") r.score = el.value === "" ? null : Number(el.value);
-  else if (k === "wrong") {
-    r.wrong = el.value.split(",").map((s) => s.trim()).filter((s) => s !== "")
-      .map((s) => (/^\d+$/.test(s) ? Number(s) : s));
-  }
-  if (k === "score") {
+  else if (k === "score") {
+    r.score = el.value === "" ? null : Number(el.value);
     const scored = r.score !== null && r.score !== undefined && r.score !== "";
     el.closest("tr").classList.toggle("scored", scored);
   }
 });
+
+// เปิด modal เมื่อคลิกปุ่มข้อที่ผิด
+$("tbody").addEventListener("click", (e) => {
+  const btn = e.target.closest(".wrbtn");
+  if (btn) openPicker(Number(btn.dataset.no));
+});
+
+/* ===== Modal เลือกข้อที่ผิด ===== */
+let editNo = null;
+let sel = new Set();
+
+function openPicker(no) {
+  const r = roster.find((x) => x.no === no);
+  if (!r) return;
+  editNo = no;
+  sel = new Set((r.wrong || []).map(Number).filter((n) => !isNaN(n)));
+  $("mWho").textContent = `${r.prefix}${r.first} ${r.last} · ${r.classroom} · เลขประจำตัว ${r.student_id || "—"}`;
+  buildGrid();
+  $("overlay").classList.add("show");
+}
+
+function buildGrid() {
+  const n = Math.max(1, Number($("numQ").value) || 30);
+  const g = $("qgrid");
+  g.innerHTML = "";
+  for (let i = 1; i <= n; i++) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "qbtn" + (sel.has(i) ? " sel" : "");
+    b.textContent = i;
+    b.addEventListener("click", () => {
+      if (sel.has(i)) sel.delete(i); else sel.add(i);
+      b.classList.toggle("sel");
+      updateSummary();
+    });
+    g.appendChild(b);
+  }
+  updateSummary();
+}
+
+function updateSummary() {
+  const n = Math.max(1, Number($("numQ").value) || 30);
+  const cnt = sel.size;
+  const mx = Number($("maxScore").value) || n;
+  const arr = [...sel].sort((a, b) => a - b);
+  $("mSummary").innerHTML = `ผิด <b>${cnt}</b> ข้อ` +
+    (cnt ? ` (${arr.join(", ")})` : "") +
+    ` · ถ้าคิดคะแนน = เต็ม−ผิด จะได้ <b style="color:var(--ok)">${Math.max(0, mx - cnt)}</b>`;
+}
+
+$("mClear").addEventListener("click", () => { sel.clear(); buildGrid(); });
+
+$("mAutoScore").addEventListener("click", () => {
+  const mx = Number($("maxScore").value) || (Number($("numQ").value) || 30);
+  const r = roster.find((x) => x.no === editNo);
+  if (r) r.score = Math.max(0, mx - sel.size);
+  savePicker();
+});
+
+$("mSave").addEventListener("click", savePicker);
+$("mCancel").addEventListener("click", closePicker);
+$("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closePicker(); });
+
+function savePicker() {
+  const r = roster.find((x) => x.no === editNo);
+  if (r) r.wrong = [...sel].sort((a, b) => a - b);
+  closePicker();
+  render();
+}
+function closePicker() { $("overlay").classList.remove("show"); editNo = null; }
 
 // --- ดาวน์โหลด helper ---
 function download(name, text) {
