@@ -30,12 +30,12 @@
   }
   label{display:block; font-weight:600; font-size:14px; margin:14px 0 6px}
   label:first-of-type{margin-top:0}
-  select,input{
+  input{
     width:100%; padding:13px 14px; font-size:16px; border:1.5px solid var(--line);
     border-radius:12px; background:#fff; color:var(--ink); font-family:inherit;
     transition:border-color .15s, box-shadow .15s;
   }
-  select:focus,input:focus{outline:none; border-color:var(--brand); box-shadow:0 0 0 4px var(--ring)}
+  input:focus{outline:none; border-color:var(--brand); box-shadow:0 0 0 4px var(--ring)}
   .hint{font-size:12.5px; color:var(--muted); margin-top:6px}
   button{
     width:100%; margin-top:20px; padding:14px; font-size:16px; font-weight:700;
@@ -46,7 +46,6 @@
   button:disabled{opacity:.6; cursor:progress}
   .msg{margin-top:16px; padding:12px 14px; border-radius:12px; font-size:14px; display:none}
   .msg.err{display:block; background:var(--errbg); color:var(--err); border:1px solid #fecaca}
-  /* หน้าผลคะแนน */
   .result{display:none}
   .result.show{display:block}
   .rname{font-size:18px; font-weight:700}
@@ -70,7 +69,6 @@
   .backlink{display:block; text-align:center; margin-top:22px; color:var(--brand);
     background:none; padding:0; font-size:14px; text-decoration:underline}
   .foot{text-align:center; color:var(--muted); font-size:12px; margin-top:20px}
-  .foot a{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -84,13 +82,15 @@
   <div class="card">
     <!-- ฟอร์มเข้าสู่ระบบ -->
     <div id="loginView">
-      <label for="student">ชื่อ–สกุลของนักเรียน</label>
-      <select id="student"><option value="">— เลือกชื่อของคุณ —</option></select>
+      <label for="sid">เลขประจำตัวนักเรียน</label>
+      <input id="sid" type="text" inputmode="numeric" autocomplete="off"
+             placeholder="เช่น 49077" />
+      <div class="hint">เลขประจำตัวนักเรียน 5 หลักของคุณ</div>
 
       <label for="phone">หมายเลขโทรศัพท์</label>
       <input id="phone" type="tel" inputmode="numeric" autocomplete="off"
              placeholder="เช่น 0812345678" />
-      <div class="hint">พิมพ์เฉพาะตัวเลข ไม่ต้องมีขีดหรือเว้นวรรค (ถ้ามี 2 เบอร์ ให้ใช้เบอร์แรก)</div>
+      <div class="hint">เบอร์ที่ใช้สมัคร พิมพ์เฉพาะตัวเลข ไม่ต้องมีขีดหรือเว้นวรรค (ถ้ามี 2 เบอร์ ให้ใช้เบอร์แรก)</div>
 
       <button id="loginBtn">ดูคะแนนของฉัน</button>
       <div class="msg err" id="errMsg"></div>
@@ -121,24 +121,11 @@
 import { normalizePhone, decryptRecord } from "./build/crypto-core.mjs";
 
 const $ = (id) => document.getElementById(id);
-let students = [];
 let records = {};
 
 async function load() {
   try {
-    const [s, r] = await Promise.all([
-      fetch("data/students.json").then((x) => x.json()),
-      fetch("data/records.json").then((x) => x.json()),
-    ]);
-    students = s;
-    records = r;
-    const sel = $("student");
-    for (const st of students) {
-      const opt = document.createElement("option");
-      opt.value = String(st.no);
-      opt.textContent = `${st.prefix}${st.first} ${st.last} (${st.classroom})`;
-      sel.appendChild(opt);
-    }
+    records = await fetch("data/records.json").then((x) => x.json());
   } catch (e) {
     showErr("โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรชหน้าใหม่อีกครั้ง");
   }
@@ -149,20 +136,18 @@ function showErr(m) {
   el.textContent = m;
   el.style.display = "block";
 }
-function clearErr() {
-  $("errMsg").style.display = "none";
-}
+function clearErr() { $("errMsg").style.display = "none"; }
 
 async function login() {
   clearErr();
-  const no = $("student").value;
+  const sid = $("sid").value.trim();
   const phone = normalizePhone($("phone").value);
-  if (!no) return showErr("กรุณาเลือกชื่อของคุณจากรายการ");
+  if (!sid) return showErr("กรุณากรอกเลขประจำตัวนักเรียน");
   if (!phone) return showErr("กรุณากรอกหมายเลขโทรศัพท์");
 
-  const rec = records[no];
+  const rec = records[sid];
   if (!rec) {
-    return showErr("ยังไม่มีข้อมูลเบอร์โทรของนักเรียนคนนี้ในระบบ กรุณาติดต่อคุณครู");
+    return showErr("ไม่พบเลขประจำตัวนี้ในระบบ (อาจไม่ได้เข้าร่วมสอบ หรือกรอกเลขไม่ถูกต้อง)");
   }
 
   const btn = $("loginBtn");
@@ -170,7 +155,7 @@ async function login() {
   btn.textContent = "กำลังตรวจสอบ...";
   try {
     const data = await decryptRecord(phone, rec);
-    showResult(no, data);
+    showResult(data);
   } catch (e) {
     showErr("หมายเลขโทรศัพท์ไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง");
   } finally {
@@ -179,10 +164,9 @@ async function login() {
   }
 }
 
-function showResult(no, data) {
-  const st = students.find((x) => String(x.no) === String(no));
-  $("rName").textContent = `${st.prefix}${st.first} ${st.last}`;
-  $("rClass").textContent = `ระดับชั้น ${st.classroom}`;
+function showResult(data) {
+  $("rName").textContent = data.name || "";
+  $("rClass").textContent = data.classroom ? `ระดับชั้น ${data.classroom}` : "";
 
   const box = $("scoreBox");
   const max = data.max ?? 30;
@@ -193,7 +177,6 @@ function showResult(no, data) {
   } else {
     box.innerHTML = `<div class="num">${data.score}<small> / ${max}</small></div>
       <div class="lbl">คะแนนที่ได้ (คะแนนเต็ม ${max} คะแนน)</div>`;
-    // ข้อที่ผิด
     $("wrongWrap").style.display = "block";
     const wc = $("wrongContent");
     const wrong = Array.isArray(data.wrong) ? data.wrong : [];
@@ -217,6 +200,7 @@ function back() {
 }
 
 $("loginBtn").addEventListener("click", login);
+$("sid").addEventListener("keydown", (e) => { if (e.key === "Enter") $("phone").focus(); });
 $("phone").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
 $("backBtn").addEventListener("click", back);
 load();
